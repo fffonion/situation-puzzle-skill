@@ -1,0 +1,4 @@
+interface:
+  display_name: "海龟汤出题器"
+  short_description: "创建海龟汤题目，并把隐藏汤底与提示写入本地私有文件"
+  default_prompt: "使用 $situation-puzzle-creator 创建一个新的海龟汤题目，并把汤底存到私有文件。"
