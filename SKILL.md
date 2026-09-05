@@ -75,6 +75,7 @@ ZIP 密码：`123456`
 - `scripts/save_puzzle.py`：写入审查完成的题目 JSON，并输出绝对路径
 - `scripts/read_puzzle.py`：读取单个字段，支持 `surface`、`solution`、`hint`、`key_facts`、`difficulty`、`type`；列表字段可配合 `--index N`
 - `scripts/game_mailbox.py`：以文件锁、revision 和原子替换实现双代理阻塞通信、轮次状态机、用户控制及玩家两次自主提示额度
+- `scripts/benchmark_runner.py`：运行固定题组；本地套件缺失时从 TurtleBench Release 自动下载、校验并解包，已有目录直接沿用
 - `scripts/telegram_game_stream.py`：读取公开邮箱并编辑当前 Telegram 会话中的同一条直播消息
 
 所有相对路径基于：

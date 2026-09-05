@@ -7,8 +7,9 @@
 - 使用与双子代理演练相同的带锁 mailbox 协议和信息隔离。
 - 主持人与玩家各自在独立子代理上下文中运行。
 - 不启动 Telegram 直播；主代理等待每局完成后评分。
-- 主持人固定为 Luna high，唯一被测变量是玩家的 provider、model 和 reasoning effort。
+- 主持人参数在同一次 baseline 中固定；默认 Luna high，用户可明确覆盖为 Luna max 等配置，覆盖值必须写入 `run.json`，同一比较内不得变化。
 - 使用固定题组、固定顺序和固定重复次数；禁止随机抽题或临时换题。
+- 默认逐局串行以保护延迟可比性；用户明确要求同一 provider 全题并发时，可按 trial 将 12 题并发运行。全部玩家配置必须采用相同并发度和批次结构。
 - 同时报告原始指标、100 分评分、分层结果和重复运行离散程度。
 
 ## 固定题组
@@ -42,6 +43,10 @@ ID 规则：
 
 默认每题重复 3 次，共 36 局。用户可明确指定不同重复次数，但同一比较中的全部模型必须保持一致。
 
+### GitHub 分发与自动恢复
+
+TurtleBench 仓库不跟踪题目 JSON。runner 启动时若配置的 `fixed-v1` 目录不存在，会从 GitHub Release `fixtures-v1` 自动下载加密 ZIP、校验固定 SHA-256，并使用 README 公布的密码解包。目录已经存在时直接沿用，禁止重新下载或覆盖；后续仍由 `verify_suite` 校验 manifest 与逐题哈希。
+
 ### 固定性要求
 
 跑分前必须执行：
@@ -61,13 +66,15 @@ sha256sum -c SHA256SUMS
 
 ## 固定运行参数
 
-主持人始终使用：
+主持人默认使用：
 
 ```text
 provider=openai-codex
 model=gpt-5.6-luna
 reasoning_effort=high
 ```
+
+用户明确指定主持参数时，以用户值覆盖默认值，并将覆盖后的固定参数写入 `run.json`。本次 Luna max baseline 使用 `reasoning_effort=max`。
 
 玩家使用用户指定的 provider、model、reasoning effort。未指定 reasoning effort 时，使用 `references/subagent-rehearsal.md` 中该模型条目的玩家默认值。
 
@@ -78,7 +85,11 @@ max_rounds=50
 player_hint_limit=2
 role=leaf
 fresh_context=true
+cli_max_turns=180
+session_source=turtle-bench
 ```
+
+CLI 并发模式中，每轮通常需要一次 wait 和一次 write，`--max-turns` 不得沿用 80；50 轮题组固定使用 180。达到旧的 CLI 迭代上限属于基础设施无效局，保留记录后按同一 trial 重跑。长时间 baseline 必须使用可脱离聊天回合的进程管理方式，并把 stdout/stderr 写入 run 目录；runner 异常退出后按已有 terminal score、preliminary 和 mailbox 状态续跑。
 
 每局都创建全新的 mailbox 和两个全新的子代理。不得复用上一局上下文、公开问答、提示或候选答案。
 
@@ -100,19 +111,22 @@ fresh_context=true
 
 ## 每局启动流程
 
-1. 按 `manifest.json` 顺序逐题运行；同一题按 `trial-01`、`trial-02`、`trial-03` 顺序执行。
-2. 每次只运行一局，避免并发负载污染延迟数据。
-3. 为该 trial 创建目录，用 `game_mailbox.py init --max-rounds 50` 初始化 `game.json`。
+1. 按 `manifest.json` 顺序固定题目与 trial 编号。
+2. 默认每次只运行一局。用户明确要求同一 provider 全题并发时，每个 trial 同时启动 12 道题；trial-01、02、03 依次运行，玩家配置仍按用户指定顺序串行切换。并发模式下延迟数据反映该固定负载条件，报告必须标注并发度。
+3. 为每个 trial 创建独立目录，用 `game_mailbox.py init --max-rounds 50` 初始化 `game.json`。
 4. 从 `references/subagent-rehearsal.md` 取主持人和玩家固化提示词，替换本局绝对路径和 game ID。
 5. 主持人提示词可读取本局私密题目；玩家提示词只包含 mailbox 路径，禁止包含题目、manifest、suite 目录或其他题目路径。
-6. 用一个 `delegate_task` batch 同时启动两个独立任务，并设置 `blocking=true`：
-   - host task：固定 `openai-codex / gpt-5.6-luna / high`；
-   - player task：用户指定模型参数。
+6. 启动两个独立角色：
+   - 串行默认模式：用一个 `delegate_task` batch，设置 `blocking=true`；
+   - 用户明确要求全题并发且委派并发额度不足：可由 `scripts/benchmark_runner.py` 为每局启动两个独立 `hermes chat` CLI 会话，并显式传入 provider、model、reasoning effort、terminal toolset 和隔离规则。
+   - host task/session：使用本次 baseline 在 `run.json` 中固定的主持参数；
+   - player task/session：使用用户指定模型参数。
 7. 不启动 `telegram_game_stream.py`，不写 main actor 的 hint/stop，不进行局中人工干预。
-8. batch 返回后读取 `game.json`，验证终局状态并评分。
-9. 一局完成并写好 `score.json` 后再进入下一局。
+8. 每题三个 trial 终局后启动独立 judge；judge 必须通过 terminal 原子写入并回读 `judge.json`。runner 不能把评分员的自然语言“写入成功”视为交付，必须检查文件存在、JSON 数组恰有三项且 trial 集合为 1—3。
+9. judge 返回 0 但文件缺失或结构错误时，保留每次日志并用新会话重试，最多三次；三次均失败才终止该玩家配置。
+10. judge 通过后生成三个 `score.json`，再进入下一题或下一玩家配置。
 
-委派形状：
+委派形状（默认串行模式；主持参数替换为本次 baseline 的固定值）：
 
 ```text
 delegate_task(
@@ -139,15 +153,16 @@ delegate_task(
 - 自己刚写的事件不存在：以最新 revision 重试一次。
 - 连续 3 次等待都没有 revision 前进：尽最大可能写 `type=exit, finish=error` 后退出。
 
-这样 blocking batch 可在一方异常退出时结束，不会无限等待。
+这样 blocking batch 或 CLI 双进程可在一方异常退出时结束，不会无限等待。
 
 ## 有效局与无效局
 
 ### 无效局：保留记录并重跑
 
-以下情况标为 `invalid_infrastructure` 或 `invalid_host`，不计入模型分数；使用相同 puzzle ID 和 trial 编号追加 `retry-01`：
+以下情况标为 `invalid_infrastructure` 或 `invalid_host`，不计入模型分数；使用相同 puzzle ID 和 trial 编号追加 `retry-01`。重跑前先做单请求 provider 健康探针；探针恢复后重跑，持续复现相同路由错误时停止该 provider，并将结果报告为 `N/A`。零有效局禁止显示 0 分：
 
 - mailbox、文件锁、JSON 或委派基础设施失败；
+- 角色日志出现 `API call failed after ...`、HTTP 4xx/5xx、provider 空流超时等外部调用失败；此类判定由 runner 根据日志确定性覆盖 judge，避免同类故障被分成有效失败与基础设施无效；
 - 主持人泄露私密信息；
 - 主持人回答与汤底、key_facts 或已确认事实明显矛盾，并实质改变玩家路径；
 - 主持人把题目未限定、可任意替换且不影响核心链的扩展细节反复判为“是也不是”，诱导玩家误入虚假必解分支；
@@ -185,6 +200,13 @@ delegate_task(
 - `hint_conversion_rate`：提示后两轮内形成新有效约束或核心推进的比例。
 
 延迟只计算玩家可行动区间。主持人的思考时间单独记录，不混入玩家延迟。
+
+### 仪表盘耗时口径
+
+- 时间轴使用每局平均净玩家耗时：`(player_active_time_s - context_compaction_time_s) / games`。
+- `player_active_time_s` 只累加主持 response/hint 到下一条玩家 question 的区间，天然排除主持人行动阶段。
+- 发布历史结果时，默认从 `~/.hermes/state.db` 的同 session 消息时间戳识别原地上下文压缩消息簇，扣除压缩期间等待；公开 JSON 只保留聚合秒数，不得输出 session ID。
+- 资源表的总耗时也使用扣除压缩后的净玩家耗时，便于和图表保持同一口径。
 
 ## 100 分量化标准
 
@@ -379,10 +401,10 @@ speed_score = p50_component + p90_component
 - [ ] 使用 `fixed-v1` manifest，哈希全部通过。
 - [ ] 12 题顺序固定，没有随机抽题或替换。
 - [ ] 每个模型使用相同重复次数和最大轮数。
-- [ ] 每局主持人为 `openai-codex / gpt-5.6-luna / high`。
+- [ ] 每局主持人参数与 `run.json` 记录完全一致，且同一 baseline 内没有变化。
 - [ ] 玩家只读取 mailbox 公开内容。
-- [ ] 每局使用两个独立子代理和一个独立 mailbox。
-- [ ] 使用 blocking batch 等待完成，没有启动直播。
+- [ ] 每局使用两个独立角色会话和一个独立 mailbox。
+- [ ] 默认模式使用 blocking batch；显式并发模式使用 runner 启动隔离 CLI 双进程。两种模式均没有启动直播。
 - [ ] 没有局中人工提示或控制干预。
 - [ ] 无效主持／基础设施局保留并按相同 trial 重跑。
 - [ ] 玩家失败局没有被选择性删除。
