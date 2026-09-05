@@ -11,6 +11,16 @@ metadata:
 
 # 海龟汤 / 情景解谜
 
+## 安装私密题库
+
+题库不存放在 Git 历史中。加密 ZIP 位于 GitHub Release `puzzle-library-v1`：
+
+```bash
+bash scripts/install-puzzle-library.sh
+```
+
+ZIP 密码：`123456`
+
 本技能是三个信息隔离角色的总入口。三个角色共享一个私密 JSON 题目文件，但允许读取的信息不同。
 
 ## 意图识别
@@ -33,7 +43,7 @@ metadata:
 - **玩家** → `references/player.md`
 - **双子代理演练编排** → `references/subagent-rehearsal.md`
 - **固定题组模型跑分** → `references/model-benchmark.md`
-- **完整原创比对题库** → `references/MASTER_all_puzzles.json`（结构与校验见 `references/puzzle-library.md`；仅出题者／作者侧加载）
+- **完整原创比对题库** → 本地 `references/MASTER_all_puzzles.json`（首次使用前按 `references/puzzle-library.md` 从 Release 安装；仅出题者／作者侧加载）
 
 加载方式：
 
@@ -84,7 +94,7 @@ metadata:
 
 - [ ] 已识别用户意图和角色。
 - [ ] 只加载需要的角色 reference；明确要求出题后主持时允许顺序加载出题者与主持人。
-- [ ] 出题者使用内置 `references/MASTER_all_puzzles.json` 完成 324 题原创性比对；完整题库不得进入玩家上下文。
+- [ ] 出题者使用本地安装的 `references/MASTER_all_puzzles.json` 完成 324 题原创性比对；完整题库不得进入玩家上下文。
 - [ ] 出题者执行 `references/creator.md` 中的量化方法论。
 - [ ] 出题者区分作者侧对抗审查与真正盲测。
 - [ ] 出题者运行配套脚本并取得真实文件路径。

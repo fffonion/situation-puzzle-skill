@@ -2,11 +2,15 @@
 
 ## 文件
 
-- 题库：`references/MASTER_all_puzzles.json`
+- 题库：本地安装至 `references/MASTER_all_puzzles.json`
+- Release：`puzzle-library-v1` / `situation-puzzle-library-v1.zip`
+- ZIP 密码：`123456`
+- 安装：`bash scripts/install-puzzle-library.sh`
 - 来源快照：`/mnt/TEMP/haitotang/puzzles_raw/MASTER_all_puzzles.json`
 - 收录：21 期，共 324 题
 - 字节数：411014
-- SHA-256：`85ae80a53cc32254abadbaf9e11385d6d47edbeb0901eee0ef68133370a0ddd3`
+- JSON SHA-256：`85ae80a53cc32254abadbaf9e11385d6d47edbeb0901eee0ef68133370a0ddd3`
+- ZIP SHA-256：`cc3d013bddf0f67b83db6623b10f087951322cbc0213637f5a48171a22822003`
 
 ## 结构
 

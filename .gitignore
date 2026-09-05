@@ -1,3 +1,4 @@
 *.pyc
 *.lock
 .env
+references/MASTER_all_puzzles.json

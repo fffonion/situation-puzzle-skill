@@ -11,7 +11,7 @@
 
 ## 原创性前置检查
 
-创作前必须读取技能内置完整题库 `references/MASTER_all_puzzles.json`，检查其中全部 324 道题的汤面、汤底和抽象因果骨架。比较重点包括：核心条件、揭晓依赖、信息出现顺序和最终重释方式。若内置文件缺失或 JSON 校验失败，才回退到 `/mnt/TEMP/haitotang/puzzles_raw/MASTER_all_puzzles.json`，并先恢复内置 reference。题库结构与校验信息见 `references/puzzle-library.md`。
+创作前必须读取本地安装的完整题库 `references/MASTER_all_puzzles.json`，检查其中全部 324 道题的汤面、汤底和抽象因果骨架。比较重点包括：核心条件、揭晓依赖、信息出现顺序和最终重释方式。文件缺失或 JSON 校验失败时，先按 `references/puzzle-library.md` 从 Release 恢复；无法下载时才回退到 `/mnt/TEMP/haitotang/puzzles_raw/MASTER_all_puzzles.json`。
 
 出现以下任一情况时丢弃草稿并更换核心条件：
 
